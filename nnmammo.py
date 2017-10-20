@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-# <nbformat>4.0</nbformat>
-
 # <markdowncell>
 # # Analise de configuração da rede MLP da base Mammography
 # #### Equipe:
@@ -12,33 +9,58 @@
 
 # <codecell>
 import numpy as np
+import pandas as pd
+from imblearn.over_sampling import RandomOverSampler, SMOTE
+from imblearn.under_sampling import ClusterCentroids, RandomUnderSampler
 
-db = ([], [])  # (instances, classes)
-with open('mammo.csv') as db_file:
-    for line in db_file:
-        instance = np.array([float(attribute)
-                             for attribute in line.split(',')])
-        db[0].append(instance[:len(instance) - 1])
-        db[1].append(instance[len(instance) - 1])
+from extended_support import cross_validate_model_configuration_variations_scores, \
+    plot_configuration_variation_cross_validation_scores_info, \
+    plot_samples_configuration_variations_cross_validation_scores_means, ModMLPClassifier
 
-print('negatives: %d, positives: %d' % (db[1].count(0), db[1].count(1)))
+print('reading database')
 
-# <markdowncell>
-# Resampling da amostra usando algoritmos de under sampling e over sampling, os algoritmos usados foram RandomOverSampler, SMOTE, AllKNN e RandomUnderSampler
+db_file = 'database.csv'
+
+df = pd.read_csv(db_file, header=None)
 
 # <codecell>
-from imblearn.over_sampling import RandomOverSampler, SMOTE
-from imblearn.under_sampling import AllKNN, RandomUnderSampler
+print('spliting database in folds')
 
+k_folds = 10
+
+negative_instances = df.values[(df.values[:, -1:] == 0).reshape(-1)][:, :-1]
+positive_instances = df.values[(df.values[:, -1:] == 1).reshape(-1)][:, :-1]
+np.random.shuffle(negative_instances)
+np.random.shuffle(positive_instances)
+print('negatives: %d, positives: %d' % (len(positive_instances), len(negative_instances)))
+
+folds_negative_instances = np.array_split(negative_instances, k_folds)
+folds_positive_instances = np.array_split(positive_instances, k_folds)
+
+folds = [(np.concatenate((folds_negative_instances[i], folds_positive_instances[i])),
+          np.concatenate((np.zeros(len(folds_negative_instances[i])), np.ones(len(folds_positive_instances[i])))))
+         for i in range(k_folds)]
+
+for index, (instances, classes) in enumerate(folds):
+    print('\t fold %d contains %d instances, %d positives, %d negatives' %
+          (index, len(instances), (classes == 0).sum(), (classes == 1).sum()))
+
+# <markdowncell>
+# Resampling da amostra usando algoritmos de under sampling e over sampling, os algoritmos usados foram
+# RandomOverSampler, SMOTE, ClusterCentroids (k-means) e RandomUnderSampler
+
+# <codecell>
+print('creating re-sampled fold copies')
 samplers = {
     'rover': RandomOverSampler(), 'smote': SMOTE(),
-    'aknn': AllKNN(n_neighbors=180, n_jobs=-1), 'runder': RandomUnderSampler()
+    'kmeans': ClusterCentroids(), 'runder': RandomUnderSampler()
 }
-db_samples = {name: sampler.fit_sample(*db)
-              for name, sampler in samplers.items()}
-for name, db_sample in db_samples.items():
-    print('%s: negatives: %d, positives: %d' %
-          (name, (db_sample[1] == 0).sum(), (db_sample[1] == 1).sum()))
+samples_folds = {name: [sampler.fit_sample(*fold) for fold in folds] for name, sampler in samplers.items()}
+for name, folds in samples_folds.items():
+    print('sampler %s fold sizes %s' % (name, [len(fold[0]) for fold in folds]))
+
+# <markdowncell>
+# Default configuration and variations for tests
 
 # <codecell>
 configuration = {
@@ -49,7 +71,10 @@ configuration = {
     'learning_rate_init': 0.001,
     'max_iter': 1600,
     'early_stopping': True,
-    'validation_fraction': 1 / 9
+    # non variable configurations
+    'train_folds': k_folds - 1,  # number of training folds (1 will be choose to validate)
+    'warm_start': False  # re-initializes the network in consecutive fit calls
+
 }
 hidden_layer_sizes = [(x,) for x in range(1, 21)]
 activation = ['logistic', 'tanh', 'relu']
@@ -58,6 +83,8 @@ learning_rate = ['constant', 'invscaling', 'adaptive']
 learning_rate_init = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
 max_iter = [200, 400, 800, 1600, 3200, 6400, ]
 early_stopping = [False, True]
+
+model_class = ModMLPClassifier
 
 # <markdowncell>
 # #### Investigar diferentes topologias da rede e diferentes valores de parâmetros (básico)
@@ -73,67 +100,33 @@ early_stopping = [False, True]
 # * Método de agrupamento para redução do conjunto
 
 # <codecell>
-import itertools
+samples_scores = {}
+for (name, sample_folds) in samples_folds.items():
+    print('sampler %s:' % name)
+    samples_scores[name] = cross_validate_model_configuration_variations_scores(sample_folds, folds, model_class,
+                                                                                configuration, 'hidden_layer_sizes',
+                                                                                hidden_layer_sizes, verbose=True)
 
-import matplotlib.pyplot as plt
-
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import cross_val_score
-from sklearn.neural_network import MLPClassifier
-
-skf = StratifiedKFold(n_splits=10, shuffle=True)
-hidden_layer_sizes_means = {}
-for (name, db_sample), size in itertools.product(db_samples.items(), hidden_layer_sizes):
-    configuration_copy = configuration.copy()
-    configuration_copy['hidden_layer_sizes'] = size
-    model = MLPClassifier(**configuration_copy)
-    score = cross_val_score(model, *db_sample, cv=skf, verbose=False)
-    if name not in hidden_layer_sizes_means:
-        hidden_layer_sizes_means[name] = []
-    hidden_layer_sizes_means[name].append(score.mean())
-    print('%s %s: %s' % (name, size, score))
+plot_samples_configuration_variations_cross_validation_scores_means(samples_scores, hidden_layer_sizes,
+                                                                    'hidden layer sizes scores', 'sizes')
+for name, configurations_fold_scores in samples_scores.items():
+    plot_configuration_variation_cross_validation_scores_info(configurations_fold_scores, hidden_layer_sizes,
+                                                              '%s specific hidden layer sizes results' % name,
+                                                              'sizes')
 
 # <codecell>
-import matplotlib.pyplot as plt
+samples_scores = {}
+requirements = {'solver': 'sgd', 'power_t': 1}
+for (name, sample_folds) in samples_folds.items():
+    print('sampler %s:' % name)
+    samples_scores[name] = cross_validate_model_configuration_variations_scores(sample_folds, folds, model_class,
+                                                                                configuration, 'learning_rate',
+                                                                                learning_rate, requirements,
+                                                                                verbose=True)
 
-plt.clf()
-x = [*range(len(hidden_layer_sizes))]
-plt.xticks(x, hidden_layer_sizes)
-for name, means in hidden_layer_sizes_means.items():
-    plt.plot(x, means, label=name, marker='x')
-plt.title('hidden layer sizes scores per sampling configuration')
-plt.xlabel('sizes')
-plt.ylabel('score')
-plt.legend()
-plt.grid()
-plt.show()
-
-# <codecell>
-learning_rate_means = {}
-for (name, db_sample), learning_rate_rule in itertools.product(db_samples.items(), learning_rate):
-    configuration_copy = configuration.copy()
-    
-    # required for learning rate rules
-    configuration_copy['solver']: 'sgd'
-    configuration_copy['power_t']: 1
-
-    configuration_copy['learning_rate'] = learning_rate_rule
-    model = MLPClassifier(**configuration_copy)
-    score = cross_val_score(model, *db_sample, cv=skf, verbose=False)
-    if name not in learning_rate_means:
-        learning_rate_means[name] = []
-    learning_rate_means[name].append(score.mean())
-    print('%s %s: %s' % (name, learning_rate_rule, score))
-
-# <codecell>
-plt.clf()
-x = [*range(len(learning_rate))]
-plt.xticks(x, learning_rate)
-for name, means in learning_rate_means.items():
-    plt.plot(x, means, label=name, marker='x')
-plt.title('learning rate rules scores per sampling configuration')
-plt.xlabel('rules')
-plt.ylabel('score')
-plt.legend()
-plt.grid()
-plt.show()
+plot_samples_configuration_variations_cross_validation_scores_means(samples_scores, learning_rate,
+                                                                    'learning rate rules scores', 'rules')
+for name, configurations_fold_scores in samples_scores.items():
+    plot_configuration_variation_cross_validation_scores_info(configurations_fold_scores, learning_rate,
+                                                              '%s specific learning rate rules results' % name,
+                                                              'rules')
