@@ -13,22 +13,26 @@ from sklearn.utils import gen_batches, shuffle
 
 class ModMLPClassifier(MLPClassifier):
     """
-    Extension of MLPClassifier class in scikit-learn, it supports the extra parameter train_folds.
+    Extension of MLPClassifier class in scikit-learn, it supports the extra parameters train_folds and max_fail.
 
     if train_folds is None: the default train_test_split is used based on validation_fraction;
-
     if is a number that indicates the number of folds of the training set: the last fold is selected as validation fold;
+
+    max_fail overrides the default constant value of max fail in the scikit implementation (2)
     """
 
     def __init__(self, hidden_layer_sizes=(100,), activation="relu", solver='adam', alpha=0.0001, batch_size='auto',
                  learning_rate="constant", learning_rate_init=0.001, power_t=0.5, max_iter=200, shuffle=True,
                  random_state=None, tol=1e-4, verbose=False, warm_start=False, momentum=0.9, nesterovs_momentum=True,
                  early_stopping=False, validation_fraction=0.1, beta_1=0.9, beta_2=0.999, epsilon=1e-8,
-                 train_folds=None):
+                 train_folds=None, max_fail=5):
         super().__init__(hidden_layer_sizes, activation, solver, alpha, batch_size, learning_rate, learning_rate_init,
                          power_t, max_iter, shuffle, random_state, tol, verbose, warm_start, momentum,
                          nesterovs_momentum, early_stopping, validation_fraction, beta_1, beta_2, epsilon)
+
+        # EXTENSION added properties
         self.train_folds = train_folds
+        self.max_fail = max_fail
 
     def _fit_stochastic(self, X, y, activations, deltas, coef_grads, intercept_grads, layer_units, incremental):
         if not incremental or not hasattr(self, '_optimizer'):
@@ -47,7 +51,7 @@ class ModMLPClassifier(MLPClassifier):
         early_stopping = self.early_stopping and not incremental
         if early_stopping:
 
-            # modified part
+            # EXTENSION train_folds (modifications here)
             X, X_val, y, y_val = self._split_train_validation(X, y)
 
             if is_classifier(self):
@@ -95,7 +99,8 @@ class ModMLPClassifier(MLPClassifier):
                 # for learning rate that needs to be updated at iteration end
                 self._optimizer.iteration_ends(self.t_)
 
-                if self._no_improvement_count > 2:
+                # EXTENSION max_fail (modified  next line)
+                if self._no_improvement_count > self.max_fail:
                     # not better than last two iterations by tol.
                     # stop or decrease learning rate
                     if early_stopping:
@@ -128,8 +133,8 @@ class ModMLPClassifier(MLPClassifier):
             self.coefs_ = self._best_coefs
             self.intercepts_ = self._best_intercepts
 
+    # EXTENSION train_folds (new function)
     def _split_train_validation(self, X, y):
-        # created function
         if self.train_folds is None or self.train_folds == 0:
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, random_state=self._random_state,
