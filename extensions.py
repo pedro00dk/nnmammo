@@ -1,6 +1,5 @@
 import warnings
 
-import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.base import is_classifier
 from sklearn.exceptions import ConvergenceWarning
