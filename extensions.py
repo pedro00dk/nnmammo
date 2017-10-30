@@ -13,12 +13,17 @@ from sklearn.utils import gen_batches, shuffle
 
 class ModMLPClassifier(MLPClassifier):
     """
-    Extension of MLPClassifier class in scikit-learn, it supports the extra parameters train_folds and max_fail.
+    Extension of MLPClassifier class in scikit-learn.
 
-    if train_folds is None: the default train_test_split is used based on validation_fraction;
-    if is a number that indicates the number of folds of the training set: the last fold is selected as validation fold;
+    This extension supports the new  parameters train_folds and max_fail.
 
-    max_fail overrides the default constant value of max fail in the scikit implementation (2)
+    param train_folds: number of folds merged in training set.
+
+    If train_folds is None the default train_test_split is used to obtain the validation set based on validation
+    fraction parameter, if is a number that indicates the number of folds of the training set: the last fold is selected
+    as validation fold.
+
+    param max_fail: overrides the default constant value (2) of max fail in the scikit-learn implementation
     """
 
     def __init__(self, hidden_layer_sizes=(100,), activation="relu", solver='adam', alpha=0.0001, batch_size='auto',
@@ -146,73 +151,3 @@ class ModMLPClassifier(MLPClassifier):
             y_train = y[0:split_index]
             y_test = y[split_index: X.shape[0]]
         return X_train, X_test, y_train, y_test
-
-
-def cross_validate_score(folds, original_folds, model, use_original_test_fold=True):
-    fold_scores = []
-    for index, test_fold in enumerate(folds):
-        train_folds = [train_fold for train_fold in folds if train_fold is not test_fold]
-        train_instances = []
-        train_classes = []
-        for train_fold in train_folds:
-            train_instances.extend(train_fold[0])
-            train_classes.extend(train_fold[1])
-        if use_original_test_fold:
-            test_instances = original_folds[index][0]
-            test_classes = original_folds[index][1]
-        else:
-            test_instances = test_fold[0]
-            test_classes = test_fold[1]
-        model.fit(train_instances, train_classes)
-        fold_scores.append(model.score(test_instances, test_classes))
-    return np.array(fold_scores)
-
-
-def cross_validate_model_configuration_variations_scores(folds, original_folds, model_class, configuration,
-                                                         variation_name, variation_values, variation_requirements=None,
-                                                         verbose=False):
-    configurations_fold_scores = []
-    configuration_copy = configuration.copy()
-    if variation_requirements is not None:
-        configuration_copy.update(variation_requirements)
-    for variation_value in variation_values:
-        configuration_copy[variation_name] = variation_value
-        model = model_class(**configuration_copy)
-        fold_scores = cross_validate_score(folds, original_folds, model)
-        configurations_fold_scores.append(fold_scores)
-        if verbose:
-            print('%s: %s -> fold scores: %s' % (variation_name, variation_value, fold_scores))
-    return np.array(configurations_fold_scores)
-
-
-def plot_samples_configuration_variations_cross_validation_scores_means(samples_scores, xticks, title, xlabel):
-    plt.clf()
-    x = [*range(len(xticks))]
-    plt.xticks(x, xticks)
-    for name, configurations_fold_scores in samples_scores.items():
-        configurations_mean_fold_scores = [fold_scores.mean() for fold_scores in configurations_fold_scores]
-        plt.plot(x, configurations_mean_fold_scores, label=name, marker='x')
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel('fold scores means')
-    plt.legend()
-    plt.grid()
-    plt.show()
-
-
-def plot_configuration_variation_cross_validation_scores_info(configurations_fold_scores, xticks, title, xlabel):
-    plt.clf()
-    x = [*range(len(xticks))]
-    plt.xticks(x, xticks)
-    mins = configurations_fold_scores.min(1)
-    maxes = configurations_fold_scores.max(1)
-    means = configurations_fold_scores.mean(1)
-    std = configurations_fold_scores.std(1)
-    plt.plot(x, means)
-    plt.errorbar(x, means, std, fmt='ok', lw=8)
-    plt.errorbar(x, means, [means - mins, maxes - means], fmt='.k', ecolor='gray', lw=3)
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel('fold scores means')
-    plt.grid()
-    plt.show()
