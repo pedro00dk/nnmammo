@@ -38,16 +38,16 @@ def validate_model(model, sample_folds, original_folds, runs=5, test_original_fo
             results['probs'].append(model.predict_proba(test_instances))
 
         if 'mse' in results or 'matrix' in results or 'roc' in results:
-            preds = results['preds'][-1] if 'preds' in results else model.predict(test_instances)
+            probs = results['probs'][-1] if 'probs' in results else model.predict_proba(test_instances)
 
         if 'mse' in results:
-            results['mse'].append(mean_squared_error(test_classes, preds))
+            results['mse'].append(mean_squared_error(test_classes, np.round(probs[:, -1])))
         if 'matrix' in results:
-            results['matrix'].append(confusion_matrix(test_classes, preds))
+            results['matrix'].append(confusion_matrix(test_classes, np.round(probs[:, -1])))
         if 'roc' in results:
-            fpr, tpr, threshold = roc_curve(test_classes, preds)
+            fpr, tpr, _ = roc_curve(test_classes, probs[:, -1])
             area = auc(fpr, tpr)
-            results['roc'].append((fpr, tpr, threshold, area))
+            results['roc'].append((fpr, tpr, area))
 
     return results
 
