@@ -17,7 +17,7 @@ def validate_model(model, sample_folds, original_folds, runs=5, test_original_fo
     :param test_original_fold: if should use sample_folds or original_original_folds test set
     :param result_data: set with expected results. Options: 'score', 'preds', 'probs', 'mse', 'matrix' and 'roc'
     :param verbose: if should print the current iteration
-    :return: a dictionary with expected_results as keys and the result as values in lists of runs * k_folds size
+    :return: a dictionary with expected_results as keys and the result as values in arrays of runs * k_folds size
     """
     results = {name: [] for name in result_data}
     for run, i in itertools.product(range(runs), range(len(sample_folds))):
@@ -47,8 +47,9 @@ def validate_model(model, sample_folds, original_folds, runs=5, test_original_fo
         if 'roc' in results:
             fpr, tpr, _ = roc_curve(test_classes, probs[:, -1])
             area = auc(fpr, tpr)
-            results['roc'].append((fpr, tpr, area))
+            results['roc'].append([fpr, tpr, area])
 
+    results = {name: np.array(r) if name != 'roc' else [np.array(d) for d in r] for name, r in results.items()}
     return results
 
 
@@ -78,6 +79,5 @@ def validate_model_configurations(model_class, sample_folds, original_folds, bas
         configuration[variation_name] = variation_value
         model = model_class(**configuration)
         result = validate_model(model, sample_folds, original_folds, runs, test_original_fold, result_data, verbose)
-        result = {name: np.asarray(data) for name, data in result.items()}
         configurations_results.append(result)
     return configurations_results
