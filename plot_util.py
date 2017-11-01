@@ -2,6 +2,7 @@ import itertools
 
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy as sp
 
 
 def plot_confusion_matrices(matrices, classes, title='Confusion matrix'):
@@ -35,31 +36,39 @@ def plot_confusion_matrices(matrices, classes, title='Confusion matrix'):
     plt.show()
 
 
-def plot_roc_curve(roc_tuples, classes, title='Receiver Operating characteristic Curve'):
-    # Not working yet
+def plot_roc_curve(roc_tuples, title='Receiver Operating characteristic Curve'):
+    """
+    Plots ROC curves, their mean and standard deviation.
 
+    :param roc_tuples: numpy array with tuples with roc curves data (fpr, tpr, auc).
+    :param title: title of the plot
+    """
     plt.clf()
 
-    mean = roc_tuples.mean(axis=(0, 1))
-    std = roc_tuples.std(axis=(0, 1))
+    fixed_fpr = np.linspace(0, 1, 200)
+    fixed_tprs = [sp.interp(fixed_fpr, fpr, tpr) for fpr, tpr, auc in roc_tuples]
+    for fixed_tpr in fixed_tprs:
+        fixed_tpr[0] = 0
+    mean_tpr = np.mean(fixed_tprs, axis=0)
+    mean_tpr[-1] = 1
+    std_tpr = np.std(fixed_tprs, axis=0)
+    std_tpr_upper = np.minimum(mean_tpr + std_tpr, 1)
+    std_tpr_lower = np.maximum(mean_tpr - std_tpr, 0)
+    mean_auc = roc_tuples[:, -1].mean()
+    std_auc = roc_tuples[:, -1].std()
 
-    for i, (fpr, tpr, thresholds, auc) in enumerate(roc_tuples):
-        plt.plot(fpr, tpr, lw=1, alpha=0.3, label='ROC  rf=%d AUC=%0.2f)' % (i, auc))
+    plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Luck', alpha=.5)
+    for i, (fpr, tpr, auc) in enumerate(roc_tuples):
+        plt.plot(fpr, tpr, lw=1, alpha=0.3, label='ROC rf=%d AUC=%0.2f)' % (i, auc))
+    plt.plot(fixed_fpr, mean_tpr, color='b', label=r'Mean ROC AUC=%0.2f±%0.2f)' % (mean_auc, std_auc), lw=2, alpha=.8)
+    plt.fill_between(fixed_fpr, std_tpr_lower, std_tpr_upper, color='gray', alpha=.2, label='±1 std. dev.')
 
-    plt.plot(mean[0], mean[1], color='b', label='Mean ROC AUC=%0.2f±%0.2f)' % (mean[3], std[3]), lw=2, alpha=0.8)
-
-    mean_fpr = np.linspace(0, 1, 100)
-    tprs_std_upper = np.minimum(mean[1] + std[1], 1)
-    tprs_std_lower = np.maximum(mean[1] - std[1], 0)
-
-    plt.fill_between(mean_fpr, tprs_std_upper, tprs_std_lower, color='gray', alpha=.2, label='±1 std. dev.')
-
-    plt.legend(loc="lower right")
     plt.title(title)
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.xlim([-0.01, 1.01])
-    plt.ylim([-0.01, 1.01])
+    plt.legend(loc="lower right")
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
     plt.show()
 
 
