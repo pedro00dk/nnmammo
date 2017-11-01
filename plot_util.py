@@ -7,18 +7,21 @@ import scipy as sp
 
 def plot_confusion_matrices(matrices, classes, title='Confusion matrix'):
     """
-    Plots confusion matrices mean, standard deviation, min and max.
+    Single configuration plot.
+    Plots k-fold cross validation confusion matrices mean, standard deviation, min and max.
 
     :param matrices: numpy array with confusion matrices to show.
     :param classes: classes represented in the matrices
-    :param title: title of the plot
+    :param title: plot title
     """
     plt.clf()
 
-    mean = matrices.mean(axis=0)
-    std = matrices.std(axis=0)
-    minimum = matrices.min(axis=0)
-    maximum = matrices.max(axis=0)
+    tick_marks = np.arange(len(classes))
+
+    mean = np.mean(matrices, axis=0)
+    std = np.std(np.asarray(matrices, float), axis=0)
+    minimum = np.min(matrices, axis=0)
+    maximum = np.max(matrices, axis=0)
 
     plt.imshow(mean, interpolation='nearest')
     for i, j in itertools.product(range(mean.shape[0]), range(mean.shape[1])):
@@ -28,7 +31,6 @@ def plot_confusion_matrices(matrices, classes, title='Confusion matrix'):
     plt.title(title)
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
-    tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, [str(clazz) for clazz in classes], rotation=45)
     plt.yticks(tick_marks, [str(clazz) for clazz in classes])
     plt.tight_layout()
@@ -38,10 +40,11 @@ def plot_confusion_matrices(matrices, classes, title='Confusion matrix'):
 
 def plot_roc_curves(roc_tuples, title='Receiver Operating characteristic Curve'):
     """
-    Plots ROC curves, their mean and standard deviation.
+    Single configuration plot.
+    Plots k-fold cross validation ROC curves, their mean and standard deviation.
 
     :param roc_tuples: numpy array with tuples with roc curves data (fpr, tpr, auc).
-    :param title: title of the plot
+    :param title: plot title
     """
     plt.clf()
 
@@ -54,14 +57,15 @@ def plot_roc_curves(roc_tuples, title='Receiver Operating characteristic Curve')
     std_tpr = np.std(fixed_tprs, axis=0)
     std_tpr_upper = np.minimum(mean_tpr + std_tpr, 1)
     std_tpr_lower = np.maximum(mean_tpr - std_tpr, 0)
-    mean_auc = roc_tuples[:, -1].mean()
-    std_auc = roc_tuples[:, -1].std()
+    aucs = [auc for fpr, tpr, auc in roc_tuples]
+    mean_auc = np.mean(aucs)
+    std_auc = np.std(aucs)
 
-    plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Luck', alpha=.5)
+    plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='red', label='Luck', alpha=0.5)
     for i, (fpr, tpr, auc) in enumerate(roc_tuples):
         plt.plot(fpr, tpr, lw=1, alpha=0.3, label='ROC rf=%d AUC=%0.2f)' % (i, auc))
-    plt.plot(fixed_fpr, mean_tpr, color='b', label=r'Mean ROC AUC=%0.2f±%0.2f)' % (mean_auc, std_auc), lw=2, alpha=.8)
-    plt.fill_between(fixed_fpr, std_tpr_lower, std_tpr_upper, color='gray', alpha=.2, label='±1 std. dev.')
+    plt.plot(fixed_fpr, mean_tpr, color='b', lw=2, alpha=0.8, label='Mean ROC AUC=%0.2f±%0.2f)' % (mean_auc, std_auc))
+    plt.fill_between(fixed_fpr, std_tpr_lower, std_tpr_upper, color='gray', alpha=0.2, label='±1 std. dev.')
 
     plt.title(title)
     plt.xlabel('False Positive Rate')
@@ -72,34 +76,31 @@ def plot_roc_curves(roc_tuples, title='Receiver Operating characteristic Curve')
     plt.show()
 
 
-def plot_samples_configuration_variations_cross_validation_scores_means(samples_scores, xticks, title, xlabel):
-    plt.clf()
-    x = [*range(len(xticks))]
-    plt.xticks(x, xticks)
-    for name, configurations_fold_scores in samples_scores.items():
-        configurations_mean_fold_scores = [fold_scores.mean() for fold_scores in configurations_fold_scores]
-        plt.plot(x, configurations_mean_fold_scores, label=name, marker='x')
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel('fold scores means')
-    plt.legend()
-    plt.grid()
-    plt.show()
+def plot_configurations_variations_single_value(values, variation_name, variation_values, title, ylabel):
+    """
+    Plot a value variation in multiple configurations (bi-dimensional array).
 
-
-def plot_configuration_variation_cross_validation_scores_info(configurations_fold_scores, xticks, title, xlabel):
+    :param values: values to plot (array of arrays)
+    :param variation_name: the varying property name
+    :param variation_values: the varying value that generated aech sub array in values
+    :param title: plot title
+    :param ylabel: y axis label (value interpretation)
+    """
     plt.clf()
-    x = [*range(len(xticks))]
-    plt.xticks(x, xticks)
-    mins = configurations_fold_scores.min(1)
-    maxes = configurations_fold_scores.max(1)
-    means = configurations_fold_scores.mean(1)
-    std = configurations_fold_scores.std(1)
-    plt.plot(x, means)
-    plt.errorbar(x, means, std, fmt='ok', lw=8)
-    plt.errorbar(x, means, [means - mins, maxes - means], fmt='.k', ecolor='gray', lw=3)
+
+    tick_marks = np.arange(len(variation_values))
+
+    means = np.mean(values, axis=1)
+    stds = np.std(values, axis=1)
+    minimums = np.min(values, axis=1)
+    maximums = np.max(values, axis=1)
+
+    plt.errorbar(tick_marks, means, stds, fmt='ok', lw=6, alpha=0.8)
+    plt.errorbar(tick_marks, means, [means - minimums, maximums - means], fmt='.k', ecolor='gray', lw=3, alpha=0.8)
+
     plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel('fold scores means')
+    plt.ylabel(ylabel)
+    plt.xlabel('Configuration Variations (%s)' % variation_name)
+    plt.xticks(tick_marks, [str(value) for value in variation_values])
     plt.grid()
     plt.show()
