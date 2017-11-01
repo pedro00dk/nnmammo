@@ -14,7 +14,7 @@ from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.under_sampling import ClusterCentroids, RandomUnderSampler
 
 from extensions import ModMLPClassifier
-from plot_util import plot_confusion_matrices, plot_roc_curve
+from plot_util import plot_confusion_matrices, plot_roc_curves
 from train_util import validate_model_configurations
 
 print('reading database')
@@ -124,5 +124,6 @@ variation_results = validate_model_configurations(
     runs=1,
     test_original_fold=True)
 
+print('MSE -> mean: %f, std: %f' % (variation_results[0]['mse'].mean(), variation_results[0]['mse'].std()))
 plot_confusion_matrices(variation_results[0]['matrix'], ['negatives', 'positives'])
-plot_roc_curve(variation_results[0]['roc'], ['negatives', 'positives'])
+plot_roc_curves(variation_results[0]['roc'], ['negatives', 'positives'])

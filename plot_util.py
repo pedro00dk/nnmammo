@@ -36,7 +36,7 @@ def plot_confusion_matrices(matrices, classes, title='Confusion matrix'):
     plt.show()
 
 
-def plot_roc_curve(roc_tuples, title='Receiver Operating characteristic Curve'):
+def plot_roc_curves(roc_tuples, title='Receiver Operating characteristic Curve'):
     """
     Plots ROC curves, their mean and standard deviation.
 
