@@ -14,17 +14,18 @@ from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.under_sampling import ClusterCentroids, RandomUnderSampler
 
 from extensions import ModMLPClassifier
+from plot_util import plot_confusion_matrices, plot_roc_curve
 from train_util import validate_model_configurations
 
 print('reading database')
-DB_FILE = 'database.csv'
-DATA_FRAME = pd.read_csv(DB_FILE, header=None)
-print('instances:  %d' % len(DATA_FRAME.values))
+db_file = 'database.csv'
+data_frame = pd.read_csv(db_file, header=None)
+print('instances:  %d' % len(data_frame.values))
 print()
 
 print('splitting negatives and positives')
-negative_instances = DATA_FRAME.values[(DATA_FRAME.values[:, -1:] == 0).reshape(-1)][:, :-1]
-positive_instances = DATA_FRAME.values[(DATA_FRAME.values[:, -1:] == 1).reshape(-1)][:, :-1]
+negative_instances = data_frame.values[(data_frame.values[:, -1:] == 0).reshape(-1)][:, :-1]
+positive_instances = data_frame.values[(data_frame.values[:, -1:] == 1).reshape(-1)][:, :-1]
 np.random.shuffle(negative_instances)
 np.random.shuffle(positive_instances)
 print('negatives: %d, positives: %d' % (len(negative_instances), len(positive_instances)))
@@ -36,10 +37,10 @@ print()
 # <codecell>
 print('creating database folds')
 k_folds = 10
-folds_negative_instances = np.array_split(negative_instances, k_folds)
-folds_positive_instances = np.array_split(positive_instances, k_folds)
-folds = [(np.concatenate((folds_negative_instances[i], folds_positive_instances[i])),
-          np.concatenate((np.zeros(len(folds_negative_instances[i])), np.ones(len(folds_positive_instances[i])))))
+negative_instances_folds = np.array_split(negative_instances, k_folds)
+positive_instances_folds = np.array_split(positive_instances, k_folds)
+folds = [(np.concatenate((negative_instances_folds[i], positive_instances_folds[i])),
+          np.concatenate((np.zeros(len(negative_instances_folds[i])), np.ones(len(positive_instances_folds[i])))))
          for i in range(k_folds)]
 print('folds: %s' % ['n: %d p: %d' % ((fold[1] == 0).sum(), (fold[1] == 1).sum()) for fold in folds])
 print()
@@ -73,14 +74,15 @@ configuration_constants = {
     'warm_start': False,
     'early_stopping': True,
 
-    'train_folds': k_folds - 1,  # number of training folds (1 will be choose to validate)
-    'max_fail': 5  # max number of consecutive fails in validation score reduction
+    # number of training folds (1 will be choose to validate)
+    'train_folds': k_folds - 1,
+    'max_fail': 2  # max number of consecutive fails in validation score reduction
 }
 
 base_configurations = [
     {
         'hidden_layer_sizes': (5,),
-        'learning_rate_init': 0.05,
+        'learning_rate_init': 0.01,
         'learning_rate': 'invscaling',
         'max_iter': 200,
     },
@@ -106,38 +108,21 @@ test_attributes = {
 }
 test_attributes_order = ['hidden_layer_sizes', 'learning_rate_init', 'learning_rate', 'max_iter']
 
-# <codecell>
-variation_results = validate_model_configurations(model_class, samples_folds['smote'], folds, base_configurations[1],
-                                                  'learning_rate', [test_attributes['learning_rate'][0]], runs=1,
-                                                  test_original_fold=True)
-
-from plot_util import plot_confusion_matrices, plot_roc_curve
-
-
-plot_confusion_matrices(variation_results[0]['matrix'], ['negatives', 'positives'])
-
-import matplotlib.pyplot as plt
-plot_roc_curve(variation_results[0]['roc'], ['negatives', 'positives'])
-
-
-
 # activation = ['logistic', 'tanh', 'relu']
 # solver = ['lbfgs', 'sgd', 'adam']
 # early_stopping = [False, True]
 
-
 # <codecell>
+# Tests here
+variation_results = validate_model_configurations(
+    model_class,
+    samples_folds['k-means'],
+    folds,
+    base_configurations[1],
+    'learning_rate',
+    [test_attributes['learning_rate'][0]],
+    runs=1,
+    test_original_fold=True)
 
-
-# <markdowncell>
-# #### Investigar diferentes topologias da rede e diferentes valores de parâmetros (básico)
-# * Tamanho do conjunto de dados
-# * Número de unidades intermediárias
-# * Influência da taxa de aprendizagem no treinamento
-# * Overfitting (memorização do conjunto de treinamento)
-#
-# #### Investigar parâmetros adicionais
-# * Algoritmo
-# * Função de ativação
-# * Taxa adaptativa
-# * Método de agrupamento para redução
+plot_confusion_matrices(variation_results[0]['matrix'], ['negatives', 'positives'])
+plot_roc_curve(variation_results[0]['roc'], ['negatives', 'positives'])
