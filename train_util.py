@@ -53,11 +53,12 @@ def validate_model(model, sample_folds, original_folds, runs=5, test_original_fo
     return results
 
 
-def validate_model_configurations(model_class, sample_folds, original_folds, base_configuration, variation_name,
-                                  variation_values, runs=5, test_original_fold=True, verbose=True):
+def validate_model_configuration_variations(model_class, sample_folds, original_folds, base_configuration,
+                                            variation_name, variation_values, runs=5, test_original_fold=True,
+                                            verbose=True):
     """
-    Tests multiples configurations of a model using k-fold cross validation over already split folds returning
-    information about the configurations.
+    Tests multiples variations of a configuration of a model using k-fold cross validation over already split folds
+    returning information about the variations.
 
     :param model_class: scikit-learn model class to validate
     :param sample_folds: list of tuples with two lists each, one of instances and other of instance's classes
@@ -68,16 +69,47 @@ def validate_model_configurations(model_class, sample_folds, original_folds, bas
     :param runs: number of runs over all folds
     :param test_original_fold: if should use sample_folds or original_original_folds test set
     :param verbose: if should print the current iteration
-    :return: list of dictionaries with mse, matrix and roc keys and corresponding arrays of test results.
+    :return: list of tuples with the configuration and dictionary with mse, matrix and roc keys and corresponding arrays
+             of test results.
     """
-    configurations_results = []
+    configuration_variations_results = []
     result_data = {'mse', 'matrix', 'roc'}
     for i, variation_value in enumerate(variation_values):
         if verbose:
-            print('variation %s -> %d of %d | %s' % (variation_name, i + 1, len(variation_values), variation_value))
+            print('variation %d of %d | %s -> %s' % (i + 1, len(variation_values), variation_name, variation_value))
         configuration = base_configuration.copy()
         configuration[variation_name] = variation_value
         model = model_class(**configuration)
         result = validate_model(model, sample_folds, original_folds, runs, test_original_fold, result_data, verbose)
-        configurations_results.append(result)
-    return configurations_results
+        configuration_variations_results.append((configuration, result))
+    return configuration_variations_results
+
+
+def validate_model_configurations_variations(model_class, sample_folds, original_folds, configurations, variation_name,
+                                             variation_values, runs=5, test_original_fold=True, verbose=True):
+    """
+    Tests multiples variations of multiples configurations of a model using k-fold cross validation over already split
+    folds returning information about the variations.
+
+    :param model_class: scikit-learn model class to validate
+    :param sample_folds: list of tuples with two lists each, one of instances and other of instance's classes
+    :param original_folds: same as sample folds but with no processing, can be None if test_original_folds is False
+    :param configurations: configurations to test the variations
+    :param variation_name: variation attribute name in model
+    :param variation_values: variation values to be tested
+    :param runs: number of runs over all folds
+    :param test_original_fold: if should use sample_folds or original_original_folds test set
+    :param verbose: if should print the current iteration
+    :return: list of tuples with the configuration and dictionary with mse, matrix and roc keys and corresponding arrays
+             of test results.
+    """
+    configurations_variations_results = []
+    for i, configuration in enumerate(configurations):
+        if verbose:
+            print('configuration %d of %d' % (i + 1, len(configurations)))
+            print('-> %s' % configuration)
+        result = validate_model_configuration_variations(model_class, sample_folds, original_folds, configuration,
+                                                         variation_name,
+                                                         variation_values, runs, test_original_fold, verbose)
+        configurations_variations_results.extend(result)
+    return configurations_variations_results

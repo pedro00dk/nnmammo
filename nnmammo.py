@@ -15,7 +15,7 @@ from imblearn.under_sampling import ClusterCentroids, RandomUnderSampler
 
 from extensions import ModMLPClassifier
 from plot_util import plot_configurations_variations_single_value, plot_confusion_matrices, plot_roc_curves
-from train_util import validate_model_configurations
+from train_util import validate_model_configurations_variations, validate_model_configuration_variations
 
 print('reading database')
 db_file = 'database.csv'
@@ -114,7 +114,7 @@ test_attributes_order = ['hidden_layer_sizes', 'learning_rate_init', 'learning_r
 
 # <codecell>
 # Tests here
-variation_results = validate_model_configurations(
+configuration_variations_results = validate_model_configuration_variations(
     model_class,
     samples_folds['r-under'],
     folds,
@@ -125,15 +125,28 @@ variation_results = validate_model_configurations(
     test_original_fold=True)
 
 # single configuration plots
-print('MSE -> mean: %s, std: %s' % (np.mean(variation_results[0]['mse']), np.std(variation_results[0]['mse'])))
-plot_confusion_matrices(variation_results[0]['matrix'], ['negatives', 'positives'])
-plot_roc_curves(variation_results[0]['roc'], ['negatives', 'positives'])
+print('MSE -> mean: %s, std: %s' % (
+    np.mean(configuration_variations_results[0][1]['mse']), np.std(configuration_variations_results[0][1]['mse'])))
+plot_confusion_matrices(configuration_variations_results[0][1]['matrix'], ['negatives', 'positives'])
+plot_roc_curves(configuration_variations_results[0][1]['roc'], ['negatives', 'positives'])
 
 # multiple configurations plots
-plot_configurations_variations_single_value([result['mse'] for result in variation_results], 'learning_rate',
-                                            [test_attributes['learning_rate'][0]], 'MSE Comparison',
-                                            'Mean Squared Error')
+plot_configurations_variations_single_value(
+    [result[1]['mse'] for result in configuration_variations_results],
+    'learning_rate',
+    [test_attributes['learning_rate'][0]], 'MSE Comparison',
+    'Mean Squared Error')
 
-plot_configurations_variations_single_value([[auc for _, _, auc in result['roc']] for result in variation_results],
-                                            'learning_rate', [test_attributes['learning_rate'][0]],
-                                            'ROC AUC Comparison', 'Area Under Curve')
+plot_configurations_variations_single_value(
+    [[auc for _, _, auc in result[1]['roc']] for result in configuration_variations_results],
+    'learning_rate', [test_attributes['learning_rate'][0]],
+    'ROC AUC Comparison', 'Area Under Curve')
+
+# <codecell>
+configurations_variations_results = validate_model_configurations_variations(
+    model_class,
+    samples_folds['k-means'],
+    folds, base_configurations,
+    'learning_rate',
+    test_attributes['learning_rate'],
+    runs=1)
