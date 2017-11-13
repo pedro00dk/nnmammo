@@ -95,3 +95,18 @@ def validate_model_configurations_variations(model_class, sample_folds, original
             configuration_variations_results.append((configuration, result))
 
     return configuration_variations_results
+
+
+def sort_configurations_variations_mean_roc_auc(configurations_variations_results):
+    """
+    Sorts the received configurations variations results by the ROC area under curve mean.
+
+    :param configurations_variations_results: list of tuples with configurations variations and results (should contains
+    roc information).
+    :return: received list sorted by mean ROC area under curve decreasing
+    """
+    roc_results = [result['roc'] for configuration_variation, result in configurations_variations_results]
+    mean_roc_auc = [np.mean([*zip(*roc_tuples)][-1]) for roc_tuples in roc_results]
+    configurations_variations_results = [*zip(configurations_variations_results, mean_roc_auc)]
+    configurations_variations_results = sorted(configurations_variations_results, key=lambda x: x[1], reverse=True)
+    return [*zip(*configurations_variations_results)][0]
