@@ -1,21 +1,20 @@
 # <markdowncell>
-# # Analise de configuração da rede MLP da base Mammography
-# #### Equipe:
-# * João Ricardo dos Santos (jrs4)
-# * Pedro Henrique Sousa de Moraes (phsm)
+# # Analise de configuração da rede MLP com a base Mammography
 
 # <markdowncell>
 # Leitura da base de dados e separação de instâncias negativas e positivas
 
 # <codecell>
-import numpy as np
+import copy
+
 import pandas as pd
+
 from imblearn.over_sampling import RandomOverSampler, SMOTE
 from imblearn.under_sampling import ClusterCentroids, RandomUnderSampler
 
-from extensions import ModMLPClassifier
-from plot_util import plot_confusion_matrices, plot_roc_curves
-from train_util import validate_model_configurations_variations, sort_configurations_variations_mean_roc_auc
+from extensions import *
+from plot_util import *
+from train_util import *
 
 print('reading database')
 db_file = 'database.csv'
@@ -39,15 +38,15 @@ print('creating database folds')
 k_folds = 10
 negative_instances_folds = np.array_split(negative_instances, k_folds)
 positive_instances_folds = np.array_split(positive_instances, k_folds)
-folds = [(np.concatenate((negative_instances_folds[i], positive_instances_folds[i])),
-          np.concatenate((np.zeros(len(negative_instances_folds[i])), np.ones(len(positive_instances_folds[i])))))
-         for i in range(k_folds)]
-print('folds: %s' % ['n: %d p: %d' % ((fold[1] == 0).sum(), (fold[1] == 1).sum()) for fold in folds])
+base_folds = [(np.concatenate((negative_instances_folds[i], positive_instances_folds[i])),
+               np.concatenate((np.zeros(len(negative_instances_folds[i])), np.ones(len(positive_instances_folds[i])))))
+              for i in range(k_folds)]
+print('folds: %s' % ['n: %d p: %d' % ((fold[1] == 0).sum(), (fold[1] == 1).sum()) for fold in base_folds])
 print()
 
 # <markdowncell>
 # Resample da amostra usando algoritmos de under sampling e over sampling, os algoritmos usados foram
-# RandomOverSampler, SMOTE, ClusterCentroids (k-means) e RandomUnderSampler
+# RandomOverSampler, SMOTE, ClusterCentroids (K-Means) e RandomUnderSampler
 #
 # Os algoritmos são aplicados individualmente em cada fold para que não haja sobreposição dos dados em diferentes folds
 
@@ -57,7 +56,7 @@ samplers = {
     'r-over': RandomOverSampler(), 'smote': SMOTE(),
     'k-means': ClusterCentroids(), 'r-under': RandomUnderSampler()
 }
-samples_folds = {name: [sampler.fit_sample(*fold) for fold in folds] for name, sampler in samplers.items()}
+samples_folds = {name: [sampler.fit_sample(*fold) for fold in base_folds] for name, sampler in samplers.items()}
 for name, sample_folds in samples_folds.items():
     print('sampler %s folds: %s' % (name, [len(fold[0]) for fold in sample_folds]))
 print()
@@ -68,88 +67,77 @@ print()
 # <codecell>
 model_class = ModMLPClassifier
 
-configuration_constants = {
-    'activation': 'logistic',
-    'solver': 'sgd',
-    'warm_start': False,
-    'early_stopping': True,
-
-    # number of training folds (1 will be choose to validate)
-    'train_folds': k_folds - 1,
-    'max_fail': 2  # max number of consecutive fails in validation score reduction
-}
-
 base_configurations = [
     {
+        'solver': 'sgd',
+        'activation': 'logistic',
+        'early_stopping': True,
         'hidden_layer_sizes': (5,),
         'learning_rate_init': 0.01,
         'learning_rate': 'invscaling',
         'max_iter': 200,
+        'warm_start': False,  # reset the model when fit is call
+        'train_folds': k_folds - 1,  # number of training folds (1 will be choose to validate)
+        'max_fail': 3  # max number of consecutive fails in validation score reduction
     },
     {
+        'solver': 'sgd',
+        'activation': 'logistic',
+        'early_stopping': True,
         'hidden_layer_sizes': (10,),
         'learning_rate_init': 0.001,
         'learning_rate': 'adaptive',
-        'max_iter': 1600,
+        'max_iter': 800,
+        'warm_start': False,  # reset the model when fit is call
+        'train_folds': k_folds - 1,  # number of training folds (1 will be choose to validate)
+        'max_fail': 3  # max number of consecutive fails in validation score reduction
     },
     {
+        'solver': 'sgd',
+        'activation': 'logistic',
+        'early_stopping': True,
         'hidden_layer_sizes': (20,),
         'learning_rate_init': 0.0001,
         'learning_rate': 'constant',
-        'max_iter': 6400,
+        'max_iter': 3200,
+        'warm_start': False,  # reset the model when fit is call
+        'train_folds': k_folds - 1,  # number of training folds (1 will be choose to validate)
+        'max_fail': 3  # max number of consecutive fails in validation score reduction
     }
 ]
 
-variations = {
-    'hidden_layer_sizes': [(2 ** x,) for x in range(1, 8)],
-    'learning_rate_init': [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05],
-    'learning_rate': ['constant', 'invscaling', 'adaptive'],
-    'max_iter': [200, 400, 800, 1600, 3200, 6400]
-}
-variations_order = [
-    'learning_rate',
-    'hidden_layer_sizes',
-    'learning_rate_init',
-    'max_iter'
+variations = [
+    ('learning_rate_init', [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]),
+    ('hidden_layer_sizes', [(2 ** x,) for x in range(1, 8)]),
+    ('max_iter', [200, 400, 800, 1600, 3200, 6400]),
+    ('learning_rate', ['constant', 'invscaling', 'adaptive'])
 ]
 
-# activation = ['logistic', 'tanh', 'relu']
-# solver = ['lbfgs', 'sgd', 'adam']
-# early_stopping = [False, True]
+print('base configurations:')
+print(pd.DataFrame(base_configurations).to_string())
+print()
 
-configurations_variations_results = validate_model_configurations_variations(
-    model_class,
-    samples_folds['k-means'],
-    folds,
-    [base_configurations[0]],
-    'learning_rate',
-    variations['learning_rate'],
-    runs=1)
+# <markdowncell>
+# Testes individuais com as diferentes bases geradas com os algoritmos de sampling
+# * K-Means
 
-plot_confusion_matrices(configurations_variations_results[0][1]['matrix'], ['negative', 'positive'])
-plot_roc_curves(configurations_variations_results[0][1]['roc'])
-
-# <codecell>
-for name, sample_folds in samples_folds.items():
-    print('training %s folds' % name)
-
-    current_configurations = [base_configurations[0]]
-
-    for variation_name in variations_order:
-        configurations_variations_results = validate_model_configurations_variations(
-            model_class,
-            sample_folds,
-            folds,
-            current_configurations,
-            variation_name,
-            variations[variation_name],
-            runs=1)
-
-        configurations_variations_results = sort_configurations_variations_mean_roc_auc(
-            configurations_variations_results)
-
-        current_configurations = [configurations_variations_results[0]]
-
-    print('best configurations')
-    print(current_configurations)
+configuration_range = 3
+print(f'optimize model configuration for k-means with configuration range of {configuration_range}')
+configurations = base_configurations
+for index, (variation_name, variation_values) in enumerate(variations):
+    print(f'variation {index} -> {variation_name}')
+    configurations_results = validate_model_configurations_variations(model_class, configurations,
+                                                                      variation_name, variation_values,
+                                                                      samples_folds['k-means'], base_folds,
+                                                                      verbose=1)
+    data_frame = pd.DataFrame([configuration for configuration, result in configurations_results])
+    data_frame['mean score'] = [sum(result['score']) / len(result['score']) for _, result in configurations_results]
+    data_frame['mean mse'] = [sum(result['mse']) / len(result['mse']) for _, result in configurations_results]
+    data_frame['mean roc auc'] = [sum(result['roc']['auc']) / len(result['roc']['auc'])
+                                  for _, result in configurations_results]
+    data_frame['data'] = [(c, r) for c, r in configurations_results]
+    data_frame.sort_values(by=['mean roc auc', 'mean score', 'mean mse'], ascending=[False, False, True], inplace=True)
+    filtered_data_frame = data_frame[[column for column in data_frame if column != 'data']]
+    configurations = [c for c, _ in data_frame['data'][:min(configuration_range, len(data_frame['data']))]]
+    print(filtered_data_frame.to_string())
     print()
