@@ -113,12 +113,12 @@ variations = [
 
 print('base configurations:')
 print(pd.DataFrame(base_configurations).to_string())
-print()
 
 # <markdowncell>
 # Testes individuais com as diferentes bases geradas com os algoritmos de sampling
 # * K-Means
 
+# <codecell>
 configuration_range = 3
 print(f'optimize model configuration for k-means with configuration range of {configuration_range}')
 configurations = base_configurations
@@ -143,7 +143,6 @@ for i, (variation_name, variation_values) in enumerate(variations):
     print(filtered_data_frame.to_string())
     plot_multi_configuration_roc_curves((r['roc'] for r in results), data_frame.index)
     print()
-    break
 
 best_configuration = configurations[0]
 best_configuration_results = results[0]
@@ -151,3 +150,14 @@ plot_single_configuration_roc_curves(best_configuration_results['roc'],
                                      title='Best configuration for k-means ROC Curve')
 plot_single_configuration_confusion_matrix(best_configuration_results['matrix'], ['neg', 'pos'],
                                            title='Best configuration for k-means Confusion Matrix')
+
+print('testing overfiting')
+overfiting_configuration = best_configuration.copy()
+overfiting_configuration['early_stopping'] = False
+overfiting_configuration['max_iter'] = 10000
+overfiting_configuration_results = validate_model(model_class(**overfiting_configuration), samples_folds['k-means'],
+                                                  base_folds)
+plot_single_configuration_roc_curves(overfiting_configuration_results['roc'],
+                                     title='Best configuration with overfiting for k-means ROC Curve')
+plot_single_configuration_confusion_matrix(overfiting_configuration_results['matrix'], ['neg', 'pos'],
+                                           title='Best configuration with overfiting for k-means Confusion Matrix')
