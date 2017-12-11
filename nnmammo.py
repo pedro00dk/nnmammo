@@ -122,6 +122,7 @@ print()
 configuration_range = 3
 print(f'optimize model configuration for k-means with configuration range of {configuration_range}')
 configurations = base_configurations
+results = None
 for i, (variation_name, variation_values) in enumerate(variations):
     print(f'variation {i} -> {variation_name}')
     configurations_results = validate_model_configurations_variations(model_class, configurations,
@@ -142,3 +143,11 @@ for i, (variation_name, variation_values) in enumerate(variations):
     print(filtered_data_frame.to_string())
     plot_multi_configuration_roc_curves((r['roc'] for r in results), data_frame.index)
     print()
+    break
+
+best_configuration = configurations[0]
+best_configuration_results = results[0]
+plot_single_configuration_roc_curves(best_configuration_results['roc'],
+                                     title='Best configuration for k-means ROC Curve')
+plot_single_configuration_confusion_matrix(best_configuration_results['matrix'], ['neg', 'pos'],
+                                           title='Best configuration for k-means Confusion Matrix')

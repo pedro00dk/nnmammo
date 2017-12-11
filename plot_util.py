@@ -83,64 +83,35 @@ def plot_multi_configuration_roc_curves(roc_dicts, labels, title='Receiver Opera
     plt.show()
 
 
-def plot_confusion_matrices(matrices, classes, title='Confusion matrix'):
+def plot_single_configuration_confusion_matrix(matrices, classes, normalize=True, title='Confusion matrix'):
     """
     Single configuration plot.
     Plots k-fold cross validation confusion matrices mean, standard deviation, min and max.
 
     :param matrices: numpy array with confusion matrices to show.
     :param classes: classes represented in the matrices
+    :param normalize: is the plot should be normalized
     :param title: plot title
     """
     plt.clf()
 
-    tick_marks = np.arange(len(classes))
+    if normalize:
+        matrices = [m.astype('float') / m.sum(axis=1)[:, np.newaxis] for m in matrices]
 
     mean = np.mean(matrices, axis=0)
     std = np.std(np.asarray(matrices, float), axis=0)
-    minimum = np.min(matrices, axis=0)
-    maximum = np.max(matrices, axis=0)
 
     plt.imshow(mean, interpolation='nearest')
     for i, j in itertools.product(range(mean.shape[0]), range(mean.shape[1])):
-        plt.text(j, i, '%.1f±%.1f(%d,%d)' % (mean[i, j], std[i, j], minimum[i, j], maximum[i, j]),
-                 horizontalalignment="center")
+        text = f'{mean[i, j]:.3f}±{std[i, j]:.3f}' if normalize else f'{mean[i, j]:d}±{std[i, j]:d}'
+        plt.text(j, i, text, horizontalalignment="center")
 
     plt.title(title)
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
+    tick_marks = np.arange(len(classes))
     plt.xticks(tick_marks, [str(clazz) for clazz in classes], rotation=45)
     plt.yticks(tick_marks, [str(clazz) for clazz in classes])
     plt.tight_layout()
     plt.colorbar()
-    plt.show()
-
-
-def plot_configurations_variations_single_value(values, variation_name, variation_values, title, ylabel):
-    """
-    Plot a value variation in multiple configurations (bi-dimensional array).
-
-    :param values: values to plot (array of arrays)
-    :param variation_name: the varying property name
-    :param variation_values: the varying value that generated aech sub array in values
-    :param title: plot title
-    :param ylabel: y axis label (value interpretation)
-    """
-    plt.clf()
-
-    tick_marks = np.arange(len(variation_values))
-
-    means = np.mean(values, axis=1)
-    stds = np.std(values, axis=1)
-    minimums = np.min(values, axis=1)
-    maximums = np.max(values, axis=1)
-
-    plt.errorbar(tick_marks, means, stds, fmt='ok', lw=6, alpha=0.8)
-    plt.errorbar(tick_marks, means, [means - minimums, maximums - means], fmt='.k', ecolor='gray', lw=3, alpha=0.8)
-
-    plt.title(title)
-    plt.ylabel(ylabel)
-    plt.xlabel('Configuration Variations (%s)' % variation_name)
-    plt.xticks(tick_marks, [str(value) for value in variation_values])
-    plt.grid()
     plt.show()
