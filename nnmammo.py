@@ -5,8 +5,6 @@
 # Leitura da base de dados e separação de instâncias negativas e positivas
 
 # <codecell>
-import copy
-
 import pandas as pd
 
 from imblearn.over_sampling import RandomOverSampler, SMOTE
@@ -124,20 +122,23 @@ print()
 configuration_range = 3
 print(f'optimize model configuration for k-means with configuration range of {configuration_range}')
 configurations = base_configurations
-for index, (variation_name, variation_values) in enumerate(variations):
-    print(f'variation {index} -> {variation_name}')
+for i, (variation_name, variation_values) in enumerate(variations):
+    print(f'variation {i} -> {variation_name}')
     configurations_results = validate_model_configurations_variations(model_class, configurations,
                                                                       variation_name, variation_values,
                                                                       samples_folds['k-means'], base_folds,
                                                                       verbose=1)
+
     data_frame = pd.DataFrame([configuration for configuration, result in configurations_results])
-    data_frame['mean score'] = [sum(result['score']) / len(result['score']) for _, result in configurations_results]
-    data_frame['mean mse'] = [sum(result['mse']) / len(result['mse']) for _, result in configurations_results]
-    data_frame['mean roc auc'] = [sum(result['roc']['auc']) / len(result['roc']['auc'])
-                                  for _, result in configurations_results]
+    data_frame['mean score'] = [np.mean(result['score']) for _, result in configurations_results]
+    data_frame['mean mse'] = [np.mean(result['mse']) for _, result in configurations_results]
+    data_frame['mean roc auc'] = [np.mean(result['roc']['auc']) for _, result in configurations_results]
     data_frame['data'] = [(c, r) for c, r in configurations_results]
+
     data_frame.sort_values(by=['mean roc auc', 'mean score', 'mean mse'], ascending=[False, False, True], inplace=True)
     filtered_data_frame = data_frame[[column for column in data_frame if column != 'data']]
     configurations = [c for c, _ in data_frame['data'][:min(configuration_range, len(data_frame['data']))]]
+    results = [r for _, r in data_frame['data'][:min(configuration_range, len(data_frame['data']))]]
     print(filtered_data_frame.to_string())
+    plot_multi_configuration_roc_curves((r['roc'] for r in results), data_frame.index)
     print()
