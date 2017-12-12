@@ -114,7 +114,8 @@ variations = [
     ('learning_rate_init', [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]),
     ('hidden_layer_sizes', [(2 ** x,) for x in range(1, 8)]),
     ('max_iter', [200, 400, 800, 1600, 3200, 6400]),
-    ('learning_rate', ['constant', 'invscaling', 'adaptive'])
+    ('learning_rate', ['constant', 'invscaling', 'adaptive']),
+    ('activation', ['relu', 'logistic', 'tanh'])
 ]
 
 if NOTEBOOK:
@@ -137,7 +138,7 @@ for sample_method, sample_folds in samples_folds.items():
         print(f'variation {i} -> {variation_name}')
         configurations_results = validate_model_configurations_variations(model_class, configurations,
                                                                           variation_name, variation_values,
-                                                                          samples_folds['k-means'], base_folds,
+                                                                          sample_folds, base_folds,
                                                                           verbose=1)
 
         db_frame = pd.DataFrame([configuration for configuration, result in configurations_results])
@@ -163,20 +164,20 @@ for sample_method, sample_folds in samples_folds.items():
     best_configuration = configurations[0]
     best_configuration_results = results[0]
     plot_single_configuration_roc_curves(best_configuration_results['roc'],
-                                         title='Best configuration for k-means ROC Curve')
+                                         title=f'Best configuration for {sample_method} ROC Curve')
     plot_single_configuration_confusion_matrix(best_configuration_results['matrix'], ['neg', 'pos'],
-                                               title='Best configuration for k-means Confusion Matrix')
+                                               title=f'Best configuration for {sample_method} Confusion Matrix')
 
     print('testing overfiting (increased verbose)')
     overfiting_configuration = best_configuration.copy()
     overfiting_configuration['max_fail'] = 1000
     overfiting_configuration['max_iter'] = 30000
-    overfiting_configuration_results = validate_model(model_class(**overfiting_configuration), samples_folds['k-means'],
+    overfiting_configuration_results = validate_model(model_class(**overfiting_configuration), sample_folds,
                                                       base_folds, verbose=3)
     plot_single_configuration_roc_curves(overfiting_configuration_results['roc'],
-                                         title='Best configuration with overfiting for k-means ROC Curve')
+                                         title=f'Best configuration with overfiting for {sample_method} ROC Curve')
     plot_single_configuration_confusion_matrix(overfiting_configuration_results['matrix'], ['neg', 'pos'],
-                                               title='Best configuration with overfiting for k-means Confusion Matrix')
+                                               title=f'Best configuration with overfiting for {sample_method} Confusion Matrix')
     print()
     print()
     print()
