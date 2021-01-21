@@ -4,9 +4,10 @@ import numpy as np
 from sklearn.base import is_classifier
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.model_selection import train_test_split
+from sklearn.neural_network._multilayer_perceptron import MLPClassifier
 # Internal needed packages
-from sklearn.neural_network._stochastic_optimizers import SGDOptimizer, AdamOptimizer
-from sklearn.neural_network.multilayer_perceptron import MLPClassifier
+from sklearn.neural_network._stochastic_optimizers import (AdamOptimizer,
+                                                           SGDOptimizer)
 from sklearn.utils import gen_batches, shuffle
 
 
